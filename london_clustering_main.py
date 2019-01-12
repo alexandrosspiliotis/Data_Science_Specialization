@@ -91,6 +91,7 @@ class LondonClustering:
         print('Exceptions Dropped!')
         df_house_no_exceptions = df_house_no_exceptions.loc[df_house_no_exceptions.Year == 88].reset_index(drop=True)
         self.df_house_cleaned = london.drop_unwanted_cols(df_house_no_exceptions)
+        self.list_neigh = self.df_house_cleaned.Neighborhood
 
     def insert_location(self):
         self.df_house_cleaned['Distance from Target'] = london.add_distance(self.df_house_cleaned,
@@ -208,15 +209,22 @@ class LondonClustering:
 
     def show_price_evolution(self, neigh, init=0, end=89, roll=1):
 
+        import matplotlib.pyplot as plt
+
         surv_time_new = [' '.join(surv.split()[2:4]) for surv in self.survey_period.values.flatten()]
-        self.df_house_ward[self.df_house_cleaned.Neighborhood[neigh]].Year = surv_time_new
-        self.list_neigh = self.df_house_cleaned.Neighborhood
 
-        time_trend = surv_time_new[init: end]
-        x = pd.to_datetime(time_trend)
-        y = self.df_house_ward[self.list_neigh[neigh]].Value[init:end].rolling(roll).mean()
+        plt.figure(figsize=(14,14))
+        plt.subplot(1,1,1)
+        
+        for ng in neigh:
+            self.df_house_ward[ng].Year = surv_time_new
 
-        sns.lineplot(x=x, y=y, label=self.df_house_cleaned.Neighborhood[neigh])
+
+            time_trend = surv_time_new[init: end]
+            x = pd.to_datetime(time_trend)
+            y = self.df_house_ward[ng].Value[init:end].rolling(roll).mean()
+
+            sns.lineplot(x=x, y=y, label=ng)
 
     def plot_data(self, param, kind='box', swarm=None):
 
