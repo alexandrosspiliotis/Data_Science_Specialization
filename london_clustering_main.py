@@ -218,7 +218,7 @@ class LondonClustering:
 
         ax.plot(self.K, self.distortions, 'bx-')
         ax.set_xlabel('k')
-        ax.set_ylabel('Distortion')
+        ax.set_ylabel('Inertia')
         ax.set_title('The Elbow Method showing the optimal k')
 
 
