@@ -3,24 +3,20 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.cluster import SpectralClustering
+from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
 import london_clustering_functions as london
 
 
-# Pandas
-# K-Means Clustering
-# Standard Scaler
-
-
 class LondonClustering:
 
-    def __init__(self, method=0, target_loc='Hammersmith Hospital, UK', n_clusters=8, weights=[1,1,1,1,1,1,1,1,1,1]):
+    def __init__(self, method=0, target_loc='Hammersmith Hospital, UK', n_clusters=8,
+                 weights=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1]):
         print('Initializing Parameters...')
         fileurl = 'land-registry-house-prices-ward.csv'
         self.df_house = pd.read_csv(fileurl)
-        #self.venue_radius = venue_radius
+        # self.venue_radius = venue_radius
         self.coordinates_method = method
         self.clusters_n = n_clusters
         self.weights = weights
@@ -51,6 +47,7 @@ class LondonClustering:
         self.insert_location()
         self.create_grouped()
         self.clustering()
+        self.elbow_analysis(40)
         print('Process Completed!')
 
     def house_data(self):
@@ -166,6 +163,7 @@ class LondonClustering:
         self.df_grouped['Distance from Target'] = self.df_house_cleaned['Distance from Target']
 
     def clustering(self):
+
         print('Creating Clusters...')
         np.random.seed(9001)
         self.df_grouped_clustering = self.df_grouped.drop('Neighborhood', 1)
@@ -177,16 +175,17 @@ class LondonClustering:
 
         self.df_grouped_clustering_unweighted = pd.DataFrame(x, columns=self.df_grouped_clustering.columns)
 
-        x_weighted = [x_obs * self.weights for x_obs in x]
+        self.x_weighted = np.array([x_obs * self.weights for x_obs in x])
 
-        self.df_grouped_clustering = pd.DataFrame(x_weighted, columns=self.df_grouped_clustering.columns)
+        self.df_grouped_clustering = pd.DataFrame(self.x_weighted, columns=self.df_grouped_clustering.columns)
 
         kclusters = self.clusters_n
-        # self.k_means = KMeans(init='k-means++', n_clusters=kclusters, n_init=10, tol=10 ** -6).fit(
+        self.k_means = KMeans(init='k-means++', n_clusters=kclusters, n_init=10, tol=10 ** -6).fit(
+            self.x_weighted)
+
+        # self.k_means = SpectralClustering(n_clusters=kclusters, affinity='nearest_neighbors',
+        #                                   assign_labels='kmeans').fit(
         #     self.df_grouped_clustering)
-        self.k_means = SpectralClustering(n_clusters=kclusters, affinity='nearest_neighbors',
-                                          assign_labels='kmeans').fit(
-            self.df_grouped_clustering)
 
         self.df_house_cleaned['Cluster Labels'] = self.k_means.labels_
         self.df_grouped['Cluster Labels'] = self.k_means.labels_
@@ -197,6 +196,31 @@ class LondonClustering:
                              for i in
                              range(0, kclusters)]
         print('Done!')
+
+    def elbow_analysis(self, max_clusters):
+
+        self.distortions = []
+        self.K = range(1, max_clusters)
+
+        for k in self.K:
+            kmeans_elbow = KMeans(init='k-means++', n_clusters=k, n_init=10, tol=10 ** -6)
+            kmeans_elbow.fit(self.x_weighted)
+            self.distortions.append(kmeans_elbow.inertia_)
+
+        #np.min(cdist(self.x_weighted, kmeans_elbow.cluster_centers_, 'euclidean'), axis=1)
+
+    def show_elbow_analysis(self):
+        import matplotlib.pyplot as plt
+
+        # Plot the elbow
+        fig = plt.figure(figsize=(7,7))
+        ax = fig.add_subplot(1,1,1)
+
+        ax.plot(self.K, self.distortions, 'bx-')
+        ax.set_xlabel('k')
+        ax.set_ylabel('Distortion')
+        ax.set_title('The Elbow Method showing the optimal k')
+
 
     def show_clusters_map(self):
         return london.clusters_map(self.df_merged)
@@ -213,12 +237,11 @@ class LondonClustering:
 
         surv_time_new = [' '.join(surv.split()[2:4]) for surv in self.survey_period.values.flatten()]
 
-        plt.figure(figsize=(14,14))
-        plt.subplot(1,1,1)
-        
+        plt.figure(figsize=(14, 14))
+        plt.subplot(1, 1, 1)
+
         for ng in neigh:
             self.df_house_ward[ng].Year = surv_time_new
-
 
             time_trend = surv_time_new[init: end]
             x = pd.to_datetime(time_trend)
@@ -250,10 +273,10 @@ class LondonClustering:
     def plot_multiple(self, params, swarm=False):
 
         import matplotlib.pyplot as plt
-        plt.figure(figsize=(11,11))
+        plt.figure(figsize=(11, 11))
 
-        for i,param in enumerate(params):
-            plt.subplot(2, 2, i+1)
+        for i, param in enumerate(params):
+            plt.subplot(2, 2, i + 1)
 
             sns.boxplot(x="Cluster Labels", y=param, data=self.df_merged,
                         palette="vlag")
@@ -264,3 +287,6 @@ class LondonClustering:
 
             sns.despine(trim=True)
 
+    def show_heatmap(self):
+        df_corr_spearman = self.df_grouped_clustering.corr(method='spearman')
+        sns.heatmap(df_corr_spearman)
